@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mechanic Dashboard - BikeConnect</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div class="logo-group">
+        <i data-lucide="wrench" class="logo-icon"></i>
+        <span>Mechanic Dashboard</span>
+      </div>
+      <div class="header-actions">
+        <button id="refreshBtn" class="btn btn-outline btn-sm" onclick="fetchMechanicData(true)">
+          <i data-lucide="refresh-cw"></i> Refresh
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="api.logout()">
+          <i data-lucide="log-out"></i> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div style="margin-bottom: 2rem;">
+      <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem;">
+        Welcome, <span id="mechanicName" style="color: var(--primary);">Mechanic</span>!
+      </h1>
+      <p style="color: var(--text-muted);">Manage repair bookings, update repair stages, and notify bike owners</p>
+    </div>
+
+    <!-- Alert Box -->
+    <div id="alertBox" class="alert" style="display: none;"></div>
+
+    <!-- Overview Stats -->
+    <div class="grid-4" style="margin-bottom: 2.5rem;">
+      <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: var(--warning-light); padding: 0.85rem; border-radius: var(--radius-md);">
+          <i data-lucide="clock" style="width: 24px; height: 24px; color: var(--warning);"></i>
+        </div>
+        <div>
+          <div id="statPending" style="font-size: 1.5rem; font-weight: 700;">0</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Pending Requests</div>
+        </div>
+      </div>
+
+      <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: var(--info-light); padding: 0.85rem; border-radius: var(--radius-md);">
+          <i data-lucide="package" style="width: 24px; height: 24px; color: var(--info);"></i>
+        </div>
+        <div>
+          <div id="statReceived" style="font-size: 1.5rem; font-weight: 700;">0</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Bikes Received</div>
+        </div>
+      </div>
+
+      <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: var(--primary-light); padding: 0.85rem; border-radius: var(--radius-md);">
+          <i data-lucide="wrench" style="width: 24px; height: 24px; color: var(--primary);"></i>
+        </div>
+        <div>
+          <div id="statInProgress" style="font-size: 1.5rem; font-weight: 700;">0</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem;">In Progress</div>
+        </div>
+      </div>
+
+      <div class="card" style="display: flex; align-items: center; gap: 1rem;">
+        <div style="background: var(--success-light); padding: 0.85rem; border-radius: var(--radius-md);">
+          <i data-lucide="check-circle" style="width: 24px; height: 24px; color: var(--success);"></i>
+        </div>
+        <div>
+          <div id="statCompleted" style="font-size: 1.5rem; font-weight: 700;">0</div>
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Completed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incoming Repair Requests (Booked status) -->
+    <div style="margin-bottom: 3rem;">
+      <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+        <i data-lucide="bell" style="color: var(--warning);"></i> Incoming Repair Requests
+      </h2>
+      <div id="pendingRequestsContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          Loading requests...
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Repairs (Received & Under Repair) -->
+    <div>
+      <h2 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+        <i data-lucide="tool" style="color: var(--primary);"></i> Active Repairs & Progress
+      </h2>
+      <div id="activeRepairsContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          Loading active repairs...
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Notes & ETA Modal -->
+  <div id="notesModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.2rem; font-weight: 700;">Update Mechanic Notes & ETA</h3>
+        <button class="btn btn-outline btn-sm" onclick="closeNotesModal()">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modalAptId">
+        <div class="form-group">
+          <label for="modalEta">Estimated Completion Time</label>
+          <input type="text" id="modalEta" class="form-control" placeholder="e.g. Today by 5:00 PM, Tomorrow 12 PM">
+        </div>
+        <div class="form-group">
+          <label for="modalNotesText">Repair Notes for Bike Owner</label>
+          <textarea id="modalNotesText" class="form-control" rows="4" placeholder="e.g. Changed spark plug and brake pads, testing bike now..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeNotesModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveNotes()">Save Updates</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    lucide.createIcons();
+
+    let allAppointments = [];
+
+    async function fetchMechanicData(isManual = false) {
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (isManual && refreshBtn) refreshBtn.disabled = true;
+
+      try {
+        const user = await api.checkAuth();
+        if (!user || user.type !== 'mechanic') {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        document.getElementById('mechanicName').textContent = user.name || user.email;
+
+        const res = await api.get('/api/mechanic-appointments');
+        allAppointments = res.appointments || [];
+        renderMechanicDashboard(allAppointments);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('alertBox').textContent = err.message || 'Failed to load mechanic appointments';
+        document.getElementById('alertBox').style.display = 'block';
+      } finally {
+        if (isManual && refreshBtn) refreshBtn.disabled = false;
+      }
+    }
+
+    function renderMechanicDashboard(appointments) {
+      // Stats
+      const pending = appointments.filter(a => a.status === 'booked');
+      const received = appointments.filter(a => a.status === 'bike-received');
+      const inProgress = appointments.filter(a => a.status === 'under-repair');
+      const completed = appointments.filter(a => a.status === 'completed');
+
+      document.getElementById('statPending').textContent = pending.length;
+      document.getElementById('statReceived').textContent = received.length;
+      document.getElementById('statInProgress').textContent = inProgress.length;
+      document.getElementById('statCompleted').textContent = completed.length;
+
+      // Render Pending
+      const pendingContainer = document.getElementById('pendingRequestsContainer');
+      if (pending.length === 0) {
+        pendingContainer.innerHTML = '<div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">No new incoming repair requests.</div>';
+      } else {
+        pendingContainer.innerHTML = pending.map(apt => {
+          const aptId = apt.id || apt._id;
+          const bike = apt.bikeId || {};
+          const customer = bike.userId || {};
+
+          return `
+            <div class="card" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem;">
+              <div style="flex: 1; min-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <h3 style="font-size: 1.2rem; font-weight: 700;">${bike.name} ${bike.model}</h3>
+                  <span class="badge badge-warning">Booked</span>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.7;">
+                  <div><strong>Customer:</strong> ${customer.name || 'Owner'} (${customer.phone || 'No phone'})</div>
+                  <div><strong>Scheduled:</strong> ${apt.date} at ${apt.time}</div>
+                  <div><strong>Reported Problem:</strong> ${bike.problem || 'Checkup required'}</div>
+                  ${apt.notes ? `<div><strong>Customer Notes:</strong> ${apt.notes}</div>` : ''}
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 140px;">
+                <button class="btn btn-success btn-sm" onclick="updateAppointmentStatus(${aptId}, 'bike-received')">
+                  <i data-lucide="check"></i> Accept Bike
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="updateAppointmentStatus(${aptId}, 'cancelled')">
+                  <i data-lucide="x"></i> Reject
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Render Active Repairs
+      const active = appointments.filter(a => ['bike-received', 'under-repair', 'completed'].includes(a.status));
+      const activeContainer = document.getElementById('activeRepairsContainer');
+      if (active.length === 0) {
+        activeContainer.innerHTML = '<div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">No active repair jobs right now.</div>';
+      } else {
+        activeContainer.innerHTML = active.map(apt => {
+          const aptId = apt.id || apt._id;
+          const bike = apt.bikeId || {};
+          const customer = bike.userId || {};
+
+          return `
+            <div class="card" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem;">
+              <div style="flex: 1; min-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                  <h3 style="font-size: 1.2rem; font-weight: 700;">${bike.name} ${bike.model}</h3>
+                  <span class="badge ${apt.status === 'completed' ? 'badge-success' : 'badge-info'}">
+                    ${apt.status.replace(/-/g, ' ')}
+                  </span>
+                </div>
+                <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.7;">
+                  <div><strong>Customer:</strong> ${customer.name || 'Owner'} &bull; ${customer.phone || ''}</div>
+                  <div><strong>Issue:</strong> ${bike.problem}</div>
+                  ${apt.estimatedCompletion ? `<div><strong>ETA:</strong> <span style="color: var(--primary); font-weight: 600;">${apt.estimatedCompletion}</span></div>` : ''}
+                  ${apt.mechanicNotes ? `<div><strong>Your Notes:</strong> ${apt.mechanicNotes}</div>` : ''}
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 180px;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Change Stage:</label>
+                <select class="form-control" style="font-size: 0.85rem;" onchange="updateAppointmentStatus(${aptId}, this.value)">
+                  <option value="bike-received" ${apt.status === 'bike-received' ? 'selected' : ''}>Bike Received</option>
+                  <option value="under-repair" ${apt.status === 'under-repair' ? 'selected' : ''}>Under Repair</option>
+                  <option value="completed" ${apt.status === 'completed' ? 'selected' : ''}>Completed (Ready)</option>
+                </select>
+                <button class="btn btn-outline btn-sm" onclick="openNotesModal(${aptId}, '${apt.estimatedCompletion || ''}', '${apt.mechanicNotes || ''}')">
+                  <i data-lucide="edit-3"></i> Add / Edit Notes
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      lucide.createIcons();
+    }
+
+    async function updateAppointmentStatus(aptId, status) {
+      try {
+        await api.put(`/api/appointments/${aptId}`, { status });
+        fetchMechanicData();
+      } catch (err) {
+        alert('Failed to update status: ' + err.message);
+      }
+    }
+
+    function openNotesModal(aptId, eta, notes) {
+      document.getElementById('modalAptId').value = aptId;
+      document.getElementById('modalEta').value = eta || '';
+      document.getElementById('modalNotesText').value = notes || '';
+      document.getElementById('notesModal').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    function closeNotesModal() {
+      document.getElementById('notesModal').style.display = 'none';
+    }
+
+    async function saveNotes() {
+      const aptId = document.getElementById('modalAptId').value;
+      const estimatedCompletion = document.getElementById('modalEta').value.trim();
+      const mechanicNotes = document.getElementById('modalNotesText').value.trim();
+
+      try {
+        await api.put(`/api/appointments/${aptId}`, { estimatedCompletion, mechanicNotes });
+        closeNotesModal();
+        fetchMechanicData();
+      } catch (err) {
+        alert('Failed to save notes: ' + err.message);
+      }
+    }
+
+    fetchMechanicData();
+    setInterval(() => fetchMechanicData(false), 30000);
+  </script>
+</body>
+</html>

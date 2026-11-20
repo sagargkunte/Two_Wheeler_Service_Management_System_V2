@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mechanic Details - BikeConnect</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <button class="btn btn-outline btn-sm" onclick="history.back()">
+          <i data-lucide="arrow-left"></i> Back
+        </button>
+        <span class="logo-group">
+          <i data-lucide="wrench" class="logo-icon"></i>
+          <span>Mechanic Details</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 800px;">
+    <div id="alertBox" class="alert" style="display: none;"></div>
+
+    <div id="contentCard" class="card" style="padding: 2.5rem;">
+      <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+        <span class="spinner" style="border-top-color: var(--primary);"></span>
+        <p>Loading mechanic profile...</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    lucide.createIcons();
+
+    const mechId = api.getQueryParam('id');
+    const bikeId = api.getQueryParam('bikeId');
+
+    async function loadMechanic() {
+      if (!mechId) {
+        document.getElementById('contentCard').innerHTML = '<p class="text-danger">Invalid mechanic ID</p>';
+        return;
+      }
+
+      try {
+        const res = await api.get(`/mechanic/${mechId}`);
+        const mech = res.mechanic;
+
+        const services = mech.servicesOffered ? mech.servicesOffered.split(',').map(s => s.trim()) : [];
+        const phone = mech.userId ? mech.userId.phone : 'Not provided';
+        const email = mech.userId ? mech.userId.email : 'Not provided';
+        const ownerName = mech.userId ? mech.userId.name : 'Verified Partner';
+
+        document.getElementById('contentCard').innerHTML = `
+          <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h1 style="font-size: 2rem; font-weight: 800; margin-bottom: 0.35rem;">${mech.shopName}</h1>
+                <p style="color: var(--text-muted); font-size: 1rem;">Operated by <strong>${ownerName}</strong> &bull; ${email}</p>
+              </div>
+              <div style="background: #dcfce7; color: var(--success); padding: 0.4rem 0.8rem; border-radius: var(--radius-md); font-size: 1.1rem; font-weight: 700;">
+                ★ ${mech.rating || 4.5}
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          ${mech.description ? `
+            <div style="margin-bottom: 1.5rem;">
+              <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">About the Workshop</h3>
+              <p style="color: var(--text-muted); line-height: 1.6;">${mech.description}</p>
+            </div>
+          ` : ''}
+
+          <!-- Location & Address -->
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Location & Contact</h3>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; color: var(--text-muted); font-size: 0.95rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="map-pin" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                <span>${mech.address || `GPS: ${mech.latitude}, ${mech.longitude}`}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="phone" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                <span>${phone}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Services -->
+          <div style="margin-bottom: 2rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem;">Services Offered</h3>
+            ${services.length === 0 ? '<p style="color: var(--text-muted);">General repair and bike maintenance.</p>' : `
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                ${services.map(s => `
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <i data-lucide="check-circle" style="color: var(--success); width: 18px; height: 18px;"></i>
+                    <span>${s}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <a href="booking-details.html?mechanicId=${mechId}&bikeId=${bikeId || ''}" class="btn btn-primary btn-block btn-lg">
+            <i data-lucide="calendar"></i> Book Appointment with This Mechanic
+          </a>
+        `;
+
+        lucide.createIcons();
+      } catch (err) {
+        document.getElementById('contentCard').innerHTML = `<p class="alert alert-error">${err.message || 'Error loading mechanic profile'}</p>`;
+      }
+    }
+
+    loadMechanic();
+  </script>
+</body>
+</html>

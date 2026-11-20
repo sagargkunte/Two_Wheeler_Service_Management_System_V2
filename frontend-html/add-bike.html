@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Bike Details - BikeConnect</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="owner-dashboard.html" class="btn btn-outline btn-sm">
+          <i data-lucide="arrow-left"></i> Back
+        </a>
+        <span class="logo-group">
+          <i data-lucide="bike" class="logo-icon"></i>
+          <span>Add Bike Details</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 650px;">
+    <div class="card" style="padding: 2rem;">
+      <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Tell Us About Your Bike</h2>
+      <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 2rem;">We will use these details to connect you with nearby verified mechanics.</p>
+
+      <div id="alertBox" class="alert" style="display: none;"></div>
+
+      <form id="addBikeForm" onsubmit="handleSubmit(event)">
+        <div class="form-group">
+          <label for="bikeName">Bike Brand / Name *</label>
+          <input type="text" id="bikeName" class="form-control" placeholder="e.g. Hero Splendor, Honda Activa, Royal Enfield" required>
+        </div>
+
+        <div class="form-group">
+          <label for="bikeModel">Model / Variant *</label>
+          <input type="text" id="bikeModel" class="form-control" placeholder="e.g. Plus, 6G, Classic 350" required>
+        </div>
+
+        <div class="form-group">
+          <label for="regNumber">Registration Number (Optional)</label>
+          <input type="text" id="regNumber" class="form-control" placeholder="e.g. MH 12 AB 1234">
+        </div>
+
+        <div class="form-group">
+          <label for="serviceType">Service Type *</label>
+          <select id="serviceType" class="form-control" required>
+            <option value="repair">Repair</option>
+            <option value="servicing">Full Servicing</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="problem">Problem Description *</label>
+          <textarea id="problem" class="form-control" rows="3" placeholder="Describe the issue you are facing (e.g., brakes squeaking, engine overheating, oil leak)..." required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="location">Your Current Location *</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="location" class="form-control" placeholder="Click 'Detect Location'" readonly required>
+            <button type="button" id="detectLocBtn" class="btn btn-outline" style="white-space: nowrap;" onclick="detectLocation()">
+              <i data-lucide="map-pin"></i> Detect
+            </button>
+          </div>
+          <small id="locCoordText" style="color: var(--text-muted); display: block; margin-top: 0.35rem;"></small>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+          <a href="owner-dashboard.html" class="btn btn-outline" style="flex: 1; text-align: center;">Cancel</a>
+          <button type="submit" id="submitBtn" class="btn btn-primary" style="flex: 2;" disabled>
+            Find Nearby Mechanics &rarr;
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    lucide.createIcons();
+
+    let userLat = null;
+    let userLon = null;
+
+    function showAlert(msg, type = 'error') {
+      const box = document.getElementById('alertBox');
+      box.textContent = msg;
+      box.className = `alert alert-${type}`;
+      box.style.display = 'block';
+    }
+
+    function detectLocation() {
+      if (!navigator.geolocation) {
+        showAlert('Geolocation is not supported by your browser.');
+        return;
+      }
+
+      const btn = document.getElementById('detectLocBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          userLat = position.coords.latitude;
+          userLon = position.coords.longitude;
+
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLon}&format=json&accept-language=en`);
+            const data = await res.json();
+            document.getElementById('location').value = data.display_name || `${userLat}, ${userLon}`;
+          } catch (e) {
+            document.getElementById('location').value = `GPS: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+          }
+
+          document.getElementById('locCoordText').textContent = `Detected coords: (${userLat.toFixed(4)}, ${userLon.toFixed(4)})`;
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="check"></i> Done';
+          document.getElementById('submitBtn').disabled = false;
+          lucide.createIcons();
+        },
+        (error) => {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="map-pin"></i> Detect';
+          showAlert('Failed to detect location: ' + error.message);
+          lucide.createIcons();
+        }
+      );
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!userLat || !userLon) {
+        showAlert('Please detect your location first.');
+        return;
+      }
+
+      const name = document.getElementById('bikeName').value.trim();
+      const model = document.getElementById('bikeModel').value.trim();
+      const registrationNumber = document.getElementById('regNumber').value.trim();
+      const serviceType = document.getElementById('serviceType').value;
+      const problem = document.getElementById('problem').value.trim();
+      const location = document.getElementById('location').value.trim();
+
+      try {
+        const res = await api.post('/user/addBike', {
+          name,
+          model,
+          registrationNumber,
+          serviceType,
+          problem,
+          location,
+          latitude: userLat,
+          longitude: userLon
+        });
+
+        const bikeId = res.bike.id || res.bike._id;
+        window.location.href = `nearby-mechanics.html?bikeId=${bikeId}&lat=${userLat}&lon=${userLon}`;
+      } catch (err) {
+        showAlert(err.message || 'Failed to add bike.');
+      }
+    }
+  </script>
+</body>
+</html>
