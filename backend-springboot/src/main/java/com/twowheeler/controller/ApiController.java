@@ -44,7 +44,7 @@ public class ApiController {
         return ResponseEntity.ok(Map.of("message", "API is working!"));
     }
 
-    @GetMapping("/me")
+    @   GetMapping("/me")
     public ResponseEntity<?> me(HttpSession session) {
         User user = getLoggedInUser(session);
         if (user == null) {
